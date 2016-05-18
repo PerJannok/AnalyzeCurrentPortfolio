@@ -54,7 +54,7 @@ def readData(li_startDate, li_endDate, ls_symbols):
     
     allStocksData={};
     
-    csvFolderPath = "C:\\Users\\pjannok\\python_workspace\\NASDAQOMX\\"
+    csvFolderPath = "C:\\Users\\pjannok\\python_workspace\\AnalyzeCurrentPortfolio\\NASDAQOMX\\"
     for symbol in ls_symbols:
         
         for filename in os.listdir(csvFolderPath):
