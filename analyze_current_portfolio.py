@@ -26,6 +26,37 @@ class stock_csv(csv.Dialect):
 
 csv.register_dialect('stock_csv', stock_csv)
 
+'''
+' Reads data from csv files extracted from NordicOMX
+' @param ls_symbols:	    list of symbols: e.g. ['GOOG','AAPL','GLD','XOM']
+' @returns d_data_csv:      dictionary structure of data mapped to keys e.g. 'open', 'close'
+'''
+def readNordicOMXCSVData(ls_symbols):
+    csvFolderPath = "C:\\Users\\pjannok\\python_workspace\\AnalyzeCurrentPortfolio\\NASDAQOMX\\"
+    
+    ls_csv_keys = ['Bid', 'Trades', 'Closing price'];
+    
+    list_csv = [];
+    
+    for key in ls_csv_keys:
+
+        df_combined = pd.DataFrame()
+        for symbol in ls_symbols:
+            for filename in os.listdir(csvFolderPath):
+                pattern = symbol+"(.*).csv";
+                if re.match(pattern, filename):
+                
+                    df_data = pd.read_csv(csvFolderPath+filename, delimiter=";", header=1, index_col=0, usecols=[0,1,2,3,4,5,6,7,8,9,10], dtype={'Closing price': np.float64, 'Bid': np.float64});
+                    df_data.rename(columns={key:symbol}, inplace=True);
+                    df_close = df_data[symbol];
+                    df_combined=pd.concat([df_combined, df_close], axis=1);
+                
+        list_csv.append(df_combined);
+
+    
+    d_data_csv = dict(zip(ls_csv_keys, list_csv));
+
+    return d_data_csv;
 
 '''
 ' Reads data from Yahoo Finance
@@ -52,47 +83,12 @@ def readData(li_startDate, li_endDate, ls_symbols):
     ls_keys = ['open', 'high', 'low', 'close', 'volume', 'actual_close'];
 
     
-    allStocksData={};
-    
-    csvFolderPath = "C:\\Users\\pjannok\\python_workspace\\AnalyzeCurrentPortfolio\\NASDAQOMX\\"
-    for symbol in ls_symbols:
-        
-        for filename in os.listdir(csvFolderPath):
-            pattern = symbol+"(.*).csv";
-            if re.match(pattern, filename):
-                
-                d={};
-                for i, row in enumerate(csv.reader(open(csvFolderPath+filename), 'stock_csv')):
-                    if i==0:
-                        separator=row;
-                    elif i==1:
-                        header=row;
-                        header.pop()
-                    else:
-                        drow=dict(zip(header, row))
-                        d[drow['Date']]=drow
-        
-                allStocksData[symbol]=d;
-    
-#    print "#INVE closing price#";
-#    print allStocksData["INVE-B"]["2015-01-07"]["Closing price"];
-#    print "###"
-#    print "#INDU closing price#";
-#    print allStocksData["INDU-C"]["2015-01-05"]["Bid"];
-#    print "###"
-    
-    
-    
-    
     #Read the data and map it to ls_keys via dict() (i.e. Hash Table structure)
     ldf_data = c_dataobj.get_data(ldt_timestamps, ls_symbols, ls_keys);
     
-    print ldf_data;
-    
     d_data = dict(zip(ls_keys, ldf_data));
     
-
-    return [d_data, allStocksData, dt_start, dt_end, dt_timeofday, ldt_timestamps];
+    return [d_data, dt_start, dt_end, dt_timeofday, ldt_timestamps];
 
     
     
@@ -173,45 +169,43 @@ def analyze(li_startDate, li_endDate, ls_symbols, lf_allocations):
         return;
 
     #Prepare data for statistics
-    [d_data, allStocksData, dt_start, dt_end, dt_timeofday, ldt_timestamps] = readData(li_startDate, li_endDate, ls_symbols);
-
-    # numpy ndarray of close prices
-#    print d_data['close'];
+    #[d_data, dt_start, dt_end, dt_timeofday, ldt_timestamps] = readData(li_startDate, li_endDate, ls_symbols);
+    d_data_csv = readNordicOMXCSVData(ls_symbols);
     
-    #for symbol in ls_symbols:
-    #    array = {'date': np.array(allStocksData[symbol].keys()), 'values': np.array(allStocksData[symbol].values())}
-    #    print array
-        
     #Get numpy ndarray of close prices (numPy)
 	#   Use adjusted close data. In QSTK, this is 'close'
-    na_price = d_data['close'].values;
+    #na_price = d_data['close'].values;
     
-    
-    sys.exit();
-    
+    na_price_csv = d_data_csv['Closing price'].values;
 
     #Normalize prices to start at 1 (if we do not do this, then portfolio value
     #must be calculated by weight*Budget/startPriceOfStock)
     #### Normalizing the prices to start at 1 and see relative returns ####
     #   Normalize the prices according to the first day The first row for each stock should have a value of 1.0 at this point
-    na_normalized_price = na_price / na_price[0,:];
+    #na_normalized_price = na_price / na_price[0,:];
 	
+    na_normalized_price_csv = na_price_csv / na_price_csv[0,:];
+    
+    
+    
 	#Assumption:
 	#   Allocate some amount of value to each equity on the first day. You then "hold" those investments for the entire year.
 
-    lf_Stats = calcStats(na_normalized_price, lf_allocations);
+    #lf_Stats_yahoo = calcStats(na_normalized_price, lf_allocations);
+    
+    lf_Stats_csv = calcStats(na_normalized_price_csv, lf_allocations);
 
     #Print results
-    print "Start Date: ", li_startDate;
-    print "End Date: ", li_endDate;
-    print "Symbols: ", ls_symbols;
-    print "Volatility (stdev daily returns): " , lf_Stats[0];
-    print "Average daily returns: " , lf_Stats[1];
-    print "Sharpe ratio: " , lf_Stats[2];
-    print "Cumulative daily return: " , lf_Stats[3];
+    print "Start Date:                       ", li_startDate;
+    print "End Date:                         ", li_endDate;
+    print "Symbols:                          ", ls_symbols;
+    print "Volatility (stdev daily returns): " , lf_Stats_csv[0];
+    print "Average daily returns:            " , lf_Stats_csv[1];
+    print "Sharpe ratio:                     " , lf_Stats_csv[2];
+    print "Cumulative daily return:          " , lf_Stats_csv[3];
 
     #Return list: [Volatility, Average Returns, Sharpe Ratio, Cumulative Return]
-    return lf_Stats[0:3]; 
+    #return lf_Stats_csv[0:3]; 
 
 
 
@@ -219,9 +213,8 @@ def analyze(li_startDate, li_endDate, ls_symbols, lf_allocations):
 Actual Implementation Starts:
 '''
 startDate = [2015,1,1];
-endDate = [2016,5,13];
-#analyze(startDate,endDate,['VIT_B', 'INDU-C', 'KLED', 'LUND-B', 'INVE-B'], [0.2, 0.2, 0.2, 0.2, 0.2]);
-analyze(startDate,endDate,['INDU-C', 'INVE-B'], [0.5, 0.5]);
+endDate = [2016,5,19];
+analyze(startDate,endDate,['VIT-B', 'INDU-C', 'KLED', 'LUND-B', 'INVE-B'], [0.2, 0.2, 0.2, 0.2, 0.2]);
 
 
 

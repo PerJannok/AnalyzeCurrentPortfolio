@@ -1,9 +1,10 @@
 # AnalyzeCurrentPortfolio
 
-Stockholmsbörsen, aktiekurser historik:
+To download historical data from NasdaqOMX:
 
-1. Create a folder NASDAQOMX
-2. PATH=%PATH%;C:\Users\pjannok\python_workspace\chromedriver
-3. Update folder paths in scrapenasdaq.py
-4. Set start date in scrapenasdaq.py
-4. python scrapenasdaq.py
+1. PATH=%PATH%;C:\Users\pjannok\python_workspace\chromedriver
+2. In scrapenasdaq.py
+    - Update folder paths
+    - Set start date
+    - Update list of stocks
+3. python scrapenasdaq.py

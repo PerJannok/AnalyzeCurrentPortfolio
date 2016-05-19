@@ -50,6 +50,24 @@ sday = '01';
 # END of user defined input
 #==========================
 
+def inplace_change(filename, old_string, new_string):
+    # Safely read the input filename using 'with'
+    with open(filename) as f:
+        s = f.read()
+        if old_string not in s:
+            print '"{old_string}" not found in {filename}.'.format(**locals())
+            return
+
+    # Safely write the changed content, if found in the file
+    with open(filename, 'w') as f:
+        print 'Changing "{old_string}" to "{new_string}" in {filename}'.format(**locals())
+        s = s.replace(old_string, new_string)
+        f.write(s)
+
+
+
+
+
 #=================================================
 # Clean csv-files from the download directory:
 #=================================================
@@ -81,10 +99,10 @@ xpaths = [];
 stockname.append("Castellum");
 stockname.append("Industriv"+u'\u00E4'+"rden C");
 stockname.append("Investor B");
-#stockname.append("Latour B");
-#stockname.append("Lundbergf");
-#stockname.append("Kungsleden");
-#stockname.append("Vitec");
+stockname.append("Latour B");
+stockname.append("Lundbergf");
+stockname.append("Kungsleden");
+stockname.append("Vitec");
 
 
 # Here we get the date of today
@@ -152,6 +170,7 @@ with open(TMPFILE) as f:
             downl = DOWNLOADLOCATION+downloadfile;
             savefile = SAVELOCATION+downloadfile;
             shutil.move(downl, savefile);
+            inplace_change(savefile, ",", ".");
 
 if OSX:
     cmd = 'rm '+TMPFILE
