@@ -9,6 +9,7 @@ import datetime as dt
 import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
+import math
 import time
 import sys
 import csv
@@ -90,7 +91,64 @@ def readData(li_startDate, li_endDate, ls_symbols):
     
     return [d_data, dt_start, dt_end, dt_timeofday, ldt_timestamps];
 
+
+def vol(returns):
+    #Calculate volatility (stdev) of daily returns of portfolio
+   	# np.std(squareArray) returns the standard deviation of all the elements in the given array
+    # Return the standard deviation of returns
+    return np.std(returns)
+
+def lpm(returns, threshold, order):
+    # This method returns a lower partial moment of the returns
+    # Create an array he same length as returns containing the minimum return threshold
+    threshold_array = np.empty(len(returns))
+    threshold_array.fill(threshold)
+    # Calculate the difference between the threshold and the returns
+    diff = threshold_array - returns
+    # Set the minimum of each to 0
+    diff = diff.clip(min=0)
+    # Return the sum of the different to the power of order
+    return np.sum(diff ** order) / len(returns)    
+
+def prices(returns, base):
+    # Converts returns into prices
+    s = [base]
+    for i in range(len(returns)):
+        s.append(base * (1 + returns[i]))
+    return np.array(s)    
     
+def dd(returns, tau):
+    # Returns the draw-down given time period tau
+    values = prices(returns, 100)
+    pos = len(values) - 1
+    pre = pos - tau
+    drawdown = float('+inf')
+    # Find the maximum drawdown given tau
+    while pre >= 0:
+        dd_i = (values[pos] / values[pre]) - 1
+        if dd_i < drawdown:
+            drawdown = dd_i
+        pos, pre = pos - 1, pre - 1
+    # Drawdown should be positive
+    return abs(drawdown)
+
+
+def max_dd(returns):
+    # Returns the maximum draw-down for any tau in (0, T) where T is the length of the return series
+    max_drawdown = float('-inf')
+    for i in range(0, len(returns)):
+        drawdown_i = dd(returns, i)
+        if drawdown_i > max_drawdown:
+            max_drawdown = drawdown_i
+    # Max draw-down should be positive
+    return abs(max_drawdown)
+
+def sharpe_ratio(er, returns, rf):
+    return (er - rf) / vol(returns)
+
+def sortino_ratio(er, returns, rf, target=0):
+    return (er - rf) / math.sqrt(lpm(returns, target, 2))
+
     
 '''
 ' Calculate Portfolio Statistics 
@@ -109,20 +167,34 @@ def calcStats(na_normalized_price, lf_allocations):
     #Calculate daily returns on portfolio
     # Calculate the daily returns of the prices. (Inplace calculation)
     # returnize0 works on ndarray and not dataframes.
-    na_portf_rets = na_portf_value.copy()
+    na_portf_rets = na_portf_value.copy();
     tsu.returnize0(na_portf_rets);
+    
+    # Risk free rate (= 3 month STIBOR, https://www.avanza.se/index/om-indexet.html/171940/3-man-stibor)
+    #risk_free_rate = -0.0047;
+    risk_free_rate = 0;
 
-    #Calculate volatility (stdev) of daily returns of portfolio
-   	# np.std(squareArray) returns the standard deviation of all the elements in the given array
-    f_portf_volatility = np.std(na_portf_rets); 
-
-    #Calculate average daily returns of portfolio
+    # ###   risk metrics    ###
+    print
+    print "###   risk metrics    ###";
+    print "vol           = ", vol(na_portf_rets);
+    print "Drawdown(5)   = ", dd(na_portf_rets, 5);
+    print "Max Drawdown  = ", max_dd(na_portf_rets);
+    
+    
+    #Calculate average daily returns of portfolio, ie. Expected return
     f_portf_avgret = np.mean(na_portf_rets);
 
-	# Sharpe ratio (Always assume you have 252 trading days in an year. And risk free rate = 0) of the total portfolio
-    #	Calculate portfolio sharpe ratio (avg portfolio return / portfolio stdev) * sqrt(252)
-    f_portf_sharpe = (f_portf_avgret / f_portf_volatility) * np.sqrt(252);
-
+    # ###   risk adjusted metrics   ###
+    print
+    print "###   risk adjusted metrics   ###";
+    # Risk-adjusted return based on Volatility
+    print "Sharpe Ratio              = ", sharpe_ratio(f_portf_avgret, na_portf_rets, risk_free_rate);
+    print "Sharpe Ratio (annualized) = ", sharpe_ratio(f_portf_avgret, na_portf_rets, risk_free_rate) * np.sqrt(252);   # avg 252 business days in a year
+    # Risk-adjusted return based on Lower Partial Moments
+    print "Sortino Ratio             = ", sortino_ratio(f_portf_avgret, na_portf_rets, risk_free_rate);
+    
+    
 	# Cumulative return of the total portfolio
     #	Calculate cumulative daily return
     #	...using recursive function
@@ -133,6 +205,7 @@ def calcStats(na_normalized_price, lf_allocations):
         #continuation
         return (cumret(t-1, lf_returns) * (1 + lf_returns[t]));
     f_portf_cumrets = cumret(na_portf_rets.size - 1, na_portf_rets);
+    
 
 #   Another way of calculating total portfolio return
 #    # Estimate portfolio returns
@@ -144,8 +217,7 @@ def calcStats(na_normalized_price, lf_allocations):
    
     
     
-    
-    return [f_portf_volatility, f_portf_avgret, f_portf_sharpe, f_portf_cumrets, na_portf_value];
+    return [f_portf_avgret, f_portf_cumrets, na_portf_value];
 
 '''
 ' Simulate and assess performance of multi-stock portfolio
@@ -172,12 +244,18 @@ def analyze(li_startDate, li_endDate, ls_symbols, lf_allocations):
     #[d_data, dt_start, dt_end, dt_timeofday, ldt_timestamps] = readData(li_startDate, li_endDate, ls_symbols);
     d_data_csv = readNordicOMXCSVData(ls_symbols);
     
+    #tweak to backfill 'Closing price' for those stocks that does not have historical data for whole date range
+    d_data_csv['Closing price'] = d_data_csv['Closing price'].fillna(method='bfill');
+    d_data_csv['Closing price'] = d_data_csv['Closing price'].fillna(1.0);
+    
+    
     #Get numpy ndarray of close prices (numPy)
 	#   Use adjusted close data. In QSTK, this is 'close'
     #na_price = d_data['close'].values;
     
     na_price_csv = d_data_csv['Closing price'].values;
-
+    
+    
     #Normalize prices to start at 1 (if we do not do this, then portfolio value
     #must be calculated by weight*Budget/startPriceOfStock)
     #### Normalizing the prices to start at 1 and see relative returns ####
@@ -186,7 +264,11 @@ def analyze(li_startDate, li_endDate, ls_symbols, lf_allocations):
 	
     na_normalized_price_csv = na_price_csv / na_price_csv[0,:];
     
-    
+
+    print "Start Date:              ", li_startDate;
+    print "End Date:                ", li_endDate;
+    print "Symbols:                 ", ls_symbols;
+
     
 	#Assumption:
 	#   Allocate some amount of value to each equity on the first day. You then "hold" those investments for the entire year.
@@ -195,18 +277,7 @@ def analyze(li_startDate, li_endDate, ls_symbols, lf_allocations):
     
     lf_Stats_csv = calcStats(na_normalized_price_csv, lf_allocations);
 
-    #Print results
-    print "Start Date:                       ", li_startDate;
-    print "End Date:                         ", li_endDate;
-    print "Symbols:                          ", ls_symbols;
-    print "Volatility (stdev daily returns): " , lf_Stats_csv[0];
-    print "Average daily returns:            " , lf_Stats_csv[1];
-    print "Sharpe ratio:                     " , lf_Stats_csv[2];
-    print "Cumulative daily return:          " , lf_Stats_csv[3];
-
-    #Return list: [Volatility, Average Returns, Sharpe Ratio, Cumulative Return]
-    #return lf_Stats_csv[0:3]; 
-
+    
 
 
 '''
@@ -214,7 +285,15 @@ Actual Implementation Starts:
 '''
 startDate = [2015,1,1];
 endDate = [2016,5,19];
-analyze(startDate,endDate,['VIT-B', 'INDU-C', 'KLED', 'LUND-B', 'INVE-B'], [0.2, 0.2, 0.2, 0.2, 0.2]);
+analyze(startDate,endDate,['GRNG', 'RROS', 'AMAST-PREF', 'CTT', 'BINV', 'MCAP', 'CAST', 'HOFI', 'INDU-C', 'INVE-B', 'KLED', 'LATO-B', 'LUND-B', 'MSC', 'VIT-B', 'AVEG'], [0.045,0.04,0.12,0.11,0.05,0.07,0.04,0.05,0.06,0.08,0.04,0.04,0.065,0.04,0.13,0.02]);
+
+
+
+
+
+
+
+
 
 
 
