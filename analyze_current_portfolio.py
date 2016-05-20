@@ -285,7 +285,7 @@ Actual Implementation Starts:
 '''
 startDate = [2015,1,1];
 endDate = [2016,5,19];
-analyze(startDate,endDate,['GRNG', 'RROS', 'AMAST-PREF', 'CTT', 'BINV', 'MCAP', 'CAST', 'HOFI', 'INDU-C', 'INVE-B', 'KLED', 'LATO-B', 'LUND-B', 'MSC', 'VIT-B', 'AVEG'], [0.045,0.04,0.12,0.11,0.05,0.07,0.04,0.05,0.06,0.08,0.04,0.04,0.065,0.04,0.13,0.02]);
+analyze(startDate,endDate,['GRNG', 'LUND-B'], [0.5, 0.5]);
 
 
 

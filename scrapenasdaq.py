@@ -99,19 +99,7 @@ xpaths = [];
 stockname.append("Castellum");
 stockname.append("Industriv"+u'\u00E4'+"rden C");
 stockname.append("Investor B");
-stockname.append("Latour B");
-stockname.append("Lundbergf");
-stockname.append("Kungsleden");
-stockname.append("Vitec");
-stockname.append("Rottneros");
-stockname.append("CTT");
-stockname.append("Bioinvent");
-stockname.append("MedCap");
-stockname.append("Avega");
-stockname.append("Hoist");
-stockname.append("Gr"+u'\u00E4'+"nges");
-stockname.append("MSC Group");
-stockname.append("Amasten Holding Pref");
+
 
 
 # Here we get the date of today
